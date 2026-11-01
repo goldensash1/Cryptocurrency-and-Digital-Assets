@@ -16,7 +16,7 @@ Verify yourself: `shasum -a 256 alu-logo.png` (macOS/Linux) or `certutil -hashfi
 - Solidity 0.8.28 (optimizer on, 200 runs)
 - Hardhat 2.29.1 (+ @nomicfoundation/hardhat-toolbox 5.0.0)
 - OpenZeppelin Contracts 5.1.0
-- Node.js 24 (18+ should work)
+- Node.js 24.14.0 (the only version tested)
 
 ## Instructions
 
@@ -29,6 +29,18 @@ npx hardhat run scripts/deploy.js --network localhost   # terminal 2: deploy + r
 npx hardhat run scripts/deploy.js           # or deploy to the in-process Hardhat network
 ```
 
+## Deploy to the Sepolia testnet
+
+1. Create a new MetaMask account used only for this project, switch it to Sepolia, and get free test ETH from a faucet.
+2. Copy `.env.example` to `.env` and paste that account's private key as `SEPOLIA_PRIVATE_KEY`. Never commit or share `.env`.
+3. Deploy, then look up the printed addresses on https://sepolia.etherscan.io:
+
+```bash
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+The same contracts can also be compiled and deployed from https://remix.ethereum.org using "Injected Provider - MetaMask".
+
 ## Project layout
 
 - `contracts/ALUAssetRegistry.sol` – ERC-721 registry (`registerAsset`, `verifyLogoIntegrity`, `getAsset`)
@@ -40,5 +52,7 @@ npx hardhat run scripts/deploy.js           # or deploy to the in-process Hardha
 
 - `npm install` failed with an `ERESOLVE` peer-dependency error because `hardhat-toolbox` needed a newer Hardhat 2.x than the one I first pinned (2.22). Fix: install `hardhat@^2.28`. Also, `npx hardhat` without a local install pulls Hardhat 3, which has a different config format, so always install locally.
 - The first compile appeared to hang: Hardhat was downloading the 0.8.28 compiler. It completes once downloaded.
-- OpenZeppelin 5 changed APIs: `Ownable` now requires an initial owner in the constructor and there is no `Counters` library, so a plain `uint256` counter is used; `_requireOwned` replaces `_exists`; access errors are custom errors (`OwnableUnauthorizedAccount`), tested with `revertedWithCustomError`.
-- ALUT uses 0 decimals so "1,000,000 tokens" is exactly 1,000,000 base units and percentages are exact whole numbers.
+
+## Design note
+
+ALUT uses 0 decimals so "1,000,000 tokens" is exactly 1,000,000 base units and percentages are exact whole numbers.
