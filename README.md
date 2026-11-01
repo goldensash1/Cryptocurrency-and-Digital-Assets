@@ -3,6 +3,8 @@
 This project registers the official ALU logo on a (local) Ethereum blockchain and tokenises its ownership.
 `ALUAssetRegistry` (ERC-721) mints one NFT that permanently records the logo's SHA-256 fingerprint, who registered it and when, and lets anyone check whether a file is authentic. `ALULogoToken` (ERC-20, symbol ALUT) issues 1,000,000 fungible tokens that represent ownership shares of that logo; the registry proves *what* the asset is, the token divides *who owns* it.
 
+Video demonstration: https://youtu.be/zuMnPCasyY8
+
 ## Logo hash (SHA-256 of `alu-logo.png`)
 
 ```
