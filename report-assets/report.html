@@ -108,6 +108,79 @@ function verifyLogoIntegrity(uint256 tokenId, bytes32 contentHash)
     if (_assets[tokenId].contentHash == contentHash) return (true, "Logo is authentic.");
     return (false, "Warning: logo does not match.");
 }</pre>
+<h3>1b. The registry's data and events (Solidity)</h3>
+<p>Each asset is a struct stored per token ID. A mapping from hash to <code>bool</code> makes the duplicate check a single cheap lookup, and the event lets the website and the Ledger read what was registered without scanning storage.</p>
+<pre>contract ALUAssetRegistry is ERC721 {
+    struct AssetMetadata {
+        string name;          // e.g. "ALU Official Logo"
+        string fileType;      // e.g. "image/png"
+        bytes32 contentHash;  // SHA-256 digest of the file
+        address registeredBy; // wallet that registered the asset
+        uint256 registeredAt; // Unix timestamp
+    }
+    uint256 private _tokenCounter;
+    mapping(uint256 => AssetMetadata) private _assets;
+    mapping(bytes32 => bool) public hashRegistered;
+
+    event AssetRegistered(uint256 indexed tokenId, address indexed registeredBy, bytes32 contentHash, string name);
+
+    constructor() ERC721("ALU Asset Registry", "ALUA") {}
+
+    function getAsset(uint256 tokenId) external view returns (AssetMetadata memory) {
+        _requireOwned(tokenId);
+        return _assets[tokenId];
+    }
+}</pre>
+<ul><li><b>ERC-721</b> (OpenZeppelin) gives each registered asset a unique token ID and an owner (<code>ownerOf</code>), which the My Assets page uses.</li>
+<li><b>Checks-effects-interactions:</b> the duplicate <code>require</code> comes first, all state is written before <code>_safeMint</code>, and the event is emitted last, so a receiving contract cannot re-enter with half-written state.</li>
+<li><b><code>calldata</code> and <code>bytes32</code>:</b> <code>name</code> and <code>fileType</code> are read straight from the transaction data (cheaper than copying to memory), and the 32-byte SHA-256 fits exactly in one <code>bytes32</code> slot.</li></ul>
+<h3>1c. The share token: <code>contracts/ALULogoToken.sol</code> (Solidity)</h3>
+<p>ALUT is an ERC-20 where the whole supply is minted to the owner once, in the constructor. Only the owner can hand out shares, enforced by <code>onlyOwner</code> from OpenZeppelin's <code>Ownable</code>. The token has 0 decimals so one token is exactly one share and the percentages are whole numbers.</p>
+<pre>contract ALULogoToken is ERC20, Ownable {
+    uint256 public constant TOTAL_SUPPLY = 1_000_000;
+
+    constructor(address logoOwner) ERC20("ALU Logo Token", "ALUT") Ownable(logoOwner) {
+        _mint(logoOwner, TOTAL_SUPPLY);
+    }
+
+    function decimals() public pure override returns (uint8) { return 0; }
+
+    function distributeShares(address recipient, uint256 amount) external onlyOwner {
+        require(amount &gt; 0, "Amount must be greater than zero");
+        _transfer(owner(), recipient, amount);
+    }
+
+    function ownershipPercentage(address account) external view returns (uint256) {
+        return (balanceOf(account) * 100) / totalSupply();   // integer division
+    }
+}</pre>
+<ul><li><b><code>onlyOwner</code></b> checks <code>msg.sender == owner()</code> before the function body runs; anyone else reverts with <code>OwnableUnauthorizedAccount</code>, so the website's disabled form is only a convenience.</li>
+<li><b><code>_transfer(owner(), ...)</code></b> always moves tokens from the owner, so the owner cannot be tricked into spending a different account's balance; an amount above the owner's balance reverts inside OpenZeppelin.</li>
+<li><b>Integer division:</b> Solidity has no decimals, so <code>ownershipPercentage</code> rounds down (a 0.4% holder shows 0%); the dashboard therefore also shows the exact percentage computed in the browser.</li>
+<li><b>Solidity 0.8.28</b> checks arithmetic overflow automatically, so <code>balanceOf * 100</code> cannot silently wrap.</li></ul>
+<h3>1d. Deployment: <code>scripts/deploy.js</code></h3>
+<p>The script deploys the registry, registers the ALU logo straight away as token 1 (hashing <code>alu-logo.png</code> with Node's <code>crypto</code>), deploys the token with the deployer as owner, then writes the addresses, ABIs and deploy block to <code>deployment.js</code>. On the local chain it also sends demo shares to three wallets; on Sepolia those example holders start with zero until the owner distributes shares.</p>
+<pre>const registry = await hre.ethers.deployContract("ALUAssetRegistry");
+await registry.waitForDeployment();
+await (await registry.registerAsset("ALU Official Logo", "image/png", hash)).wait();   // token ID 1
+
+const token = await hre.ethers.deployContract("ALULogoToken", [deployer.address]);    // owner gets 1,000,000 ALUT
+await token.waitForDeployment();</pre>
+<h3>1e. Smart contract summary</h3>
+<table>
+<tr><th>Contract</th><th>Function / event</th><th>Type</th><th>Who can call</th><th>Used by the dApp for</th></tr>
+<tr><td rowspan="5">ALUAssetRegistry (ERC-721)</td><td><code>registerAsset(name, fileType, hash)</code></td><td>transaction (gas)</td><td>anyone</td><td>Register page</td></tr>
+<tr><td><code>verifyLogoIntegrity(tokenId, hash)</code></td><td>view (free)</td><td>anyone</td><td>Verify page</td></tr>
+<tr><td><code>getAsset(tokenId)</code>, <code>ownerOf(tokenId)</code></td><td>view (free)</td><td>anyone</td><td>Verify result, My Assets</td></tr>
+<tr><td><code>hashRegistered(hash)</code></td><td>view (free)</td><td>anyone</td><td>duplicate pre-check</td></tr>
+<tr><td>event <code>AssetRegistered</code></td><td>event</td><td>-</td><td>token ID after signing, Ledger</td></tr>
+<tr><td rowspan="5">ALULogoToken (ERC-20, ALUT)</td><td><code>distributeShares(recipient, amount)</code></td><td>transaction (gas)</td><td>owner only</td><td>Dashboard send form</td></tr>
+<tr><td><code>totalSupply()</code>, <code>balanceOf(account)</code></td><td>view (free)</td><td>anyone</td><td>Dashboard, header balance</td></tr>
+<tr><td><code>ownershipPercentage(account)</code></td><td>view (free)</td><td>anyone</td><td>Dashboard table</td></tr>
+<tr><td><code>owner()</code></td><td>view (free)</td><td>anyone</td><td>enables the owner-only form</td></tr>
+<tr><td>event <code>Transfer</code></td><td>event</td><td>-</td><td>Ledger (mint and transfers)</td></tr>
+</table>
+<p>Both contracts are deployed on Sepolia (registry 0xE0997C14...8145, token 0x10755cC9...66F5) and covered by the 13 Hardhat tests: duplicate rejection, authentic and tampered verification, owner-only distribution, supply and balances, plus the five frontend integration tests.</p>
 <h3>2. The connection: <code>frontend/js/deployment.js</code></h3>
 <p>Generated by <code>scripts/deploy.js</code>. It holds the network, the two contract addresses, the start block for the ledger and the ABIs copied from Hardhat's build output, so the browser knows how to encode every call: <code>registryAddress</code> 0xE0997C14...8145, <code>tokenAddress</code> 0x10755cC9...66F5, <code>deployBlock</code>, <code>registryAbi</code> and <code>tokenAbi</code>.</p>
 <h3>3. The logic: <code>frontend/js/alu.js</code></h3>
