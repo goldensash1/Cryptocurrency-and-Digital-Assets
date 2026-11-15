@@ -7,7 +7,7 @@ A browser application (dApp) for the two Formative 1 smart contracts:
 
 The contracts are unchanged from Formative 1 (they had no bugs; all 8 original tests still pass). The new work is the `frontend/` folder, an updated `scripts/deploy.js`, and 5 new tests.
 
-Video demonstration (Assignment 2): **ADD LINK HERE BEFORE SUBMITTING**
+Video demonstration (Assignment 2): https://youtu.be/DcFJqzDvwok
 Project report: [Project_Report.pdf](Project_Report.pdf)
 Video demonstration (Formative 1): https://youtu.be/zuMnPCasyY8
 GitHub: https://github.com/goldensash1/Individual-Assignment-2-DApp-Integration-with-Smart-Contract
