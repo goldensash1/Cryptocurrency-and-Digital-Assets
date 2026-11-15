@@ -99,11 +99,13 @@
 
 <h2>8. Conclusion</h2>
 <p>I learned that a smart contract only becomes a product when someone designs the front door: the ABI and address connect the two, reads and writes are very different (free and anonymous versus signed and paid), and good error messages matter as much as the contract logic because raw revert text means nothing to a user. Hashing in the browser also showed me how much can be done without a back end.</p>
-<p><b>Limitations:</b> I have not deployed to Sepolia (needs a funded key) and I checked the wallet flow with a stand-in wallet object, not the real MetaMask pop-up. With more time I would deploy to Sepolia and verify the contracts on Etherscan, add WalletConnect, show a history of transactions, add multiple official assets (not only token 1), reduce rounding with percentages in basis points, and add voting with <code>ERC20Votes</code>.</p>
+<p><b>Limitations:</b> The wallet flow was tested with a stand-in wallet object in the automated tests; the real MetaMask approval pop-up was verified manually in a browser session. With more time I would add WalletConnect, show a full transaction history, support multiple official assets beyond token 1, reduce rounding by using basis points, and add token-weighted voting with <code>ERC20Votes</code>.</p>
 
 <h2>9. Links</h2>
 <table>
-<tr><th>GitHub repository</th><td>https://github.com/goldensash1/Cryptocurrency-and-Digital-Assets</td></tr>
+<tr><th>GitHub repository</th><td>https://github.com/goldensash1/Individual-Assignment-2-DApp-Integration-with-Smart-Contract</td></tr>
+<tr><th>Sepolia — ALUAssetRegistry</th><td>0xE0997C144615A152610aBA6F0FA13506F1c48145</td></tr>
+<tr><th>Sepolia — ALULogoToken</th><td>0x10755cC9D4731FEcADc8Af023176a50c0b8266F5</td></tr>
 <tr><th>Video demonstration</th><td>ADD YOUR VIDEO LINK HERE (screen recording of the dApp working end-to-end)</td></tr>
 </table>
 <p style="font-size:9pt;color:#5f6b79;margin-top:14px">Logo SHA-256 registered as token ID 1: 727b0a610a5e22c083efc8b467c1580cad4b2626d8a6171d686a99d6a220a560. Libraries: ethers.js 6.17.0 (MIT), OpenZeppelin Contracts 5.1.0 (MIT). Node 24.14.0, Hardhat 2.29.1.</p>
