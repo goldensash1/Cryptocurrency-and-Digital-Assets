@@ -9,7 +9,21 @@ The contracts are unchanged from Formative 1 (they had no bugs; all 8 original t
 
 Video demonstration (Assignment 2): **ADD LINK HERE BEFORE SUBMITTING**
 Video demonstration (Formative 1): https://youtu.be/zuMnPCasyY8
-GitHub: https://github.com/goldensash1/Cryptocurrency-and-Digital-Assets
+GitHub: https://github.com/goldensash1/Individual-Assignment-2-DApp-Integration-with-Smart-Contract
+
+## Sepolia testnet deployment
+
+| Contract | Address |
+|---|---|
+| ALUAssetRegistry (ERC-721) | `0xE0997C144615A152610aBA6F0FA13506F1c48145` |
+| ALULogoToken (ERC-20, ALUT) | `0x10755cC9D4731FEcADc8Af023176a50c0b8266F5` |
+
+Deployer / owner: `0x19ef7F7121B66B8440e3c0A8091EE9674978AD27` (Account 2, Sepolia)
+Chain ID: 11155111
+
+View on Etherscan:
+- https://sepolia.etherscan.io/address/0xE0997C144615A152610aBA6F0FA13506F1c48145
+- https://sepolia.etherscan.io/address/0x10755cC9D4731FEcADc8Af023176a50c0b8266F5
 
 ## SHA-256 hash of the ALU logo registered in Formative 1
 
