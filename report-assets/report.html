@@ -35,7 +35,7 @@
 <div class="diagram">
   <div class="box r"><b>Browser (the dApp)</b>index.html, app.js, alu.js<br>SHA-256 via Web Crypto<br>ethers.js v6</div>
   <div class="arrow">read calls<br>&#8596;<br>(no wallet, free)</div>
-  <div class="box"><b>JSON-RPC node</b>Hardhat local chain<br>(or Sepolia)</div>
+  <div class="box"><b>JSON-RPC node</b>Sepolia testnet<br>(or local Hardhat chain)</div>
   <div class="arrow">state<br>&#8596;</div>
   <div class="box"><b>Smart contracts</b>ALUAssetRegistry (ERC-721)<br>ALULogoToken (ERC-20)</div>
 </div>
@@ -49,27 +49,27 @@
 
 <h2>3. Feature walkthrough</h2>
 <h3>Header and wallet (every page)</h3>
-<p>The Connect Wallet button sits in the header of every page. After connecting it shows the shortened address (<code>0xf39F...2266</code>) and the ALUT balance, plus a Disconnect button. If no wallet is installed a banner explains that MetaMask or Coinbase Wallet is needed and that verification still works without one (screenshot below). If the wallet is on the wrong network, a banner offers a "Switch network" button.</p>
-<img class="shot" src="10-no-wallet.png"><div class="cap">No wallet installed: helpful message; the Register page explains what to do.</div>
+<p>The Connect Wallet button sits in the header of every page. After connecting it shows the shortened address (<code>0x19ef...AD27</code>) and the ALUT balance, plus a Disconnect button. A Refresh button in the navigation reloads the current page. If no wallet is installed a banner explains that MetaMask or Coinbase Wallet is needed and that verification still works without one. If the wallet is on the wrong network, a banner offers a "Switch network" button. The screenshot shows MetaMask (Account 2) connected on Sepolia, with the address and 1,000,000 ALUT balance in the header.</p>
+<img class="shot" src="n07-wallet-connected.png"><div class="cap">Real MetaMask wallet connected to the Sepolia deployment: shortened address and ALUT balance in the header.</div>
 
 <h3>Verify page (public)</h3>
 <p>The visitor drops an image or pastes a hash. The result is a big green check with "Logo Verified: This is the authentic ALU logo" and the registered name, date and wallet, or a red warning "This logo has been modified". No hex strings are shown in the result.</p>
-<img class="shot" src="02-verify-authentic.png"><div class="cap">The real alu-logo.png: verified (no wallet connected).</div>
-<img class="shot" src="03-verify-modified.png"><div class="cap">The same file with one extra byte: flagged as modified.</div>
-<img class="half" src="04-verify-hash.png"><div class="cap">Verification by pasting a hash.</div>
+<img class="shot" src="n02-verify-authentic.png"><div class="cap">The real alu-logo.png checked against the Sepolia contract: verified (no wallet connected).</div>
+<img class="shot" src="n03-verify-modified.png"><div class="cap">The same file with one extra byte: flagged as modified.</div>
+<img class="half" src="n04-verify-hash.png"><div class="cap">Verification by pasting a hash.</div>
 
 <h3>Register page</h3>
 <p>The user picks an image; the page shows a preview and the computed SHA-256 as a bytes32 value, and pre-fills the form. After entering a name and file type and clicking Register, the wallet asks for approval; when the transaction is confirmed the page shows the new token ID. Registering a duplicate shows a clear message instead of a raw error.</p>
-<img class="shot" src="09-register-success.png"><div class="cap">Successful registration: token ID 2.</div>
-<img class="shot" src="08-register-duplicate.png"><div class="cap">Duplicate rejection for the already-registered logo.</div>
+<img class="shot" src="n08-register-metamask.png"><div class="cap">Register page on Sepolia: image preview, SHA-256 bytes32 hash, name and type filled in, and "Waiting for your approval" while MetaMask asks the user to confirm the transaction.</div>
+<img class="shot" src="n06-register-nowallet.png"><div class="cap">Register page without a connected wallet: the user is told to connect before registering.</div>
 
 <div class="q"><b>Why generate the hash in the browser instead of sending the file to a server?</b> Privacy and trust. The file never leaves the user's computer, so there is nothing to leak, intercept or store, and no server to be hacked or to lie about the result. It also removes the cost and the single point of failure of running a server, and anyone can audit the 10 lines that compute the hash.</div>
 <div class="q"><b>What happens in the contract when someone registers a hash that already exists?</b> <code>registerAsset()</code> starts with <code>require(!hashRegistered[contentHash], "Asset already registered: duplicate content hash")</code>. The condition fails, the transaction reverts, no NFT is minted, no state changes, and the sender only loses the gas used up to that point. The dApp checks <code>hashRegistered()</code> first (a free read) so the user is told before being asked to sign.</div>
 <div class="q"><b>What does approving a transaction in the wallet mean?</b> The user agrees to send exactly this transaction from their address: a call to <code>registerAsset</code> on this contract address with this name, type and hash, and to pay the network fee (gas) for it. They are also agreeing that it is permanent: once confirmed, it cannot be undone and the NFT is minted to their wallet. The wallet shows the destination and fee so they can check before signing.</div>
 
 <h3>Dashboard</h3>
-<p>It shows the total supply (1,000,000), the connected wallet's balance and its ownership percentage from <code>ownershipPercentage()</code>, and a table of the owner and three example stakeholders (Faculty Board 25%, Student Council 15%, Alumni Fund 10%). The owner also sees the distribution form.</p>
-<img class="shot" src="07-dashboard-distributed.png"><div class="cap">Owner view after sending 50,000 ALUT: balances and percentages updated (owner 500,000 &#8594; 450,000).</div>
+<p>It shows the total supply (1,000,000), the connected wallet's balance and its ownership percentage from <code>ownershipPercentage()</code>, and a table of the owner and three example stakeholder wallets (Faculty Board, Student Council, Alumni Fund). On the Sepolia deployment the owner currently holds all 1,000,000 ALUT until shares are distributed. The owner also sees the distribution form.</p>
+<img class="shot" src="n05-dashboard.png"><div class="cap">Live Sepolia dashboard: total supply 1,000,000 ALUT read from the contract, holder table with percentages, and the distribute form (enabled only for the owner wallet).</div>
 
 <h2>4. Wallet and Web3 integration</h2>
 <p><b>How connecting works.</b> Wallets such as MetaMask and Coinbase Wallet inject an object called <code>window.ethereum</code> into the page. Clicking Connect Wallet calls <code>eth_requestAccounts</code>; the wallet pops up and the user approves sharing their address. The app then wraps that object in an ethers.js <code>BrowserProvider</code>, asks it for a <code>Signer</code>, and creates the two contract objects from the signer. The app listens for the wallet's <code>accountsChanged</code> and <code>chainChanged</code> events, so switching account or network rebuilds the connection, and locking the wallet disconnects the page. On load it reconnects quietly if the wallet already trusts the site, unless the user pressed Disconnect.</p>
@@ -87,7 +87,7 @@
 
 <h2>6. Token dashboard</h2>
 <p>All numbers come from <code>ALULogoToken</code>: <code>totalSupply()</code>, <code>balanceOf()</code>, <code>ownershipPercentage()</code> and <code>owner()</code>. The percentage is a whole number (integer division in Solidity), so the page also shows the exact value. The distribute form is enabled only when the connected address equals <code>owner()</code>; other wallets see it disabled with an explanation. Before sending, the code checks that the address is valid, the amount is above zero and not greater than the owner's balance, then calls <code>distributeShares()</code>, waits for confirmation and re-reads all balances.</p>
-<img class="shot" src="06-dashboard-nonowner.png"><div class="cap">Connected as a non-owner (Student Council wallet): form disabled and explained.</div>
+<p>Without the owner wallet connected, the form is disabled and the page explains why (see the dashboard screenshot above).</p>
 <div class="q"><b>How does onlyOwner protect distributeShares()?</b> <code>onlyOwner</code> (from OpenZeppelin's <code>Ownable</code>) runs before the function body and checks <code>msg.sender == owner()</code>. The EVM knows the sender because the transaction is signed with their key, so it cannot be faked. If anyone else calls it, the contract reverts with <code>OwnableUnauthorizedAccount(address)</code>; nothing is transferred and the caller just wastes gas. The dApp stops it earlier too (disabled form and a check in <code>alu.js</code>), but the contract is the real protection, because anyone could bypass a website and call the contract directly.</div>
 <div class="q"><b>Who might receive ALUT and what would it mean?</b> For example the Student Council, given 150,000 ALUT (15%). In practice it would be a recorded, transferable stake in the logo's ownership: the Council could show on-chain proof of its share, and, if ALU adopted rules for it, receive a matching share of any licensing income or have a say in how the logo is used. Today the token itself carries no legal rights; those would come from an agreement that refers to it.</div>
 <div class="q"><b>What must change for token-weighted voting?</b> Add on-chain governance: make ALUT an <code>ERC20Votes</code> token (balance snapshots/checkpoints plus delegation, so votes cannot be counted twice by moving tokens around), and add a governor contract (for example OpenZeppelin <code>Governor</code>) that creates proposals, counts votes weighted by each wallet's checkpointed balance at the proposal's start block, and executes the result. Holders would also need to delegate (even to themselves) to activate their votes, and <code>onlyOwner</code> actions would be moved under the governor.</div>
@@ -95,11 +95,11 @@
 <h2 class="pb">7. Test results</h2>
 <p>All 13 tests pass with <code>npx hardhat test</code>: 8 from Formative 1 and 5 new frontend integration tests that import the real <code>frontend/js/alu.js</code> and run it against freshly deployed contracts.</p>
 <img class="half" style="width:88%" src="11-tests-passing.png"><div class="cap">Output of <code>npx hardhat test</code>: 13 passing.</div>
-<p>Besides the automated tests I ran the full dApp in a browser against a local chain: verifying the real, a tampered and a pasted hash; connecting, registering a new logo and the duplicate; distributing shares as owner; and checking that a non-owner is blocked.</p>
+<p>Besides the automated tests I ran the dApp in a browser against the contracts deployed on the Sepolia testnet: verifying the real logo, a tampered copy and a pasted hash (screenshots above), connecting a real MetaMask wallet, and viewing the live dashboard. Earlier, on a local Hardhat chain, I also exercised registering, the duplicate rejection, distributing shares and the non-owner block.</p>
 
 <h2>8. Conclusion</h2>
 <p>I learned that a smart contract only becomes a product when someone designs the front door: the ABI and address connect the two, reads and writes are very different (free and anonymous versus signed and paid), and good error messages matter as much as the contract logic because raw revert text means nothing to a user. Hashing in the browser also showed me how much can be done without a back end.</p>
-<p><b>Limitations:</b> The wallet flow was tested with a stand-in wallet object in the automated tests; the real MetaMask approval pop-up was verified manually in a browser session. With more time I would add WalletConnect, show a full transaction history, support multiple official assets beyond token 1, reduce rounding by using basis points, and add token-weighted voting with <code>ERC20Votes</code>.</p>
+<p><b>Limitations:</b> The automated tests use a stand-in wallet object; the real MetaMask connection and approval were checked manually on Sepolia. Files re-saved or re-compressed get a different hash and are reported as modified. With more time I would add WalletConnect, show a full transaction history, support multiple official assets beyond token 1, reduce rounding by using basis points, and add token-weighted voting with <code>ERC20Votes</code>.</p>
 
 <h2>9. Links</h2>
 <table>

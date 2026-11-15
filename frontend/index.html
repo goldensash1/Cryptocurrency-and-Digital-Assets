@@ -19,7 +19,10 @@
       <nav class="nav" aria-label="Main">
         <a href="#/verify" data-route="verify">Verify</a>
         <a href="#/register" data-route="register">Register</a>
+        <a href="#/assets" data-route="assets">My Assets</a>
         <a href="#/dashboard" data-route="dashboard">Dashboard</a>
+        <a href="#/ledger" data-route="ledger">Ledger</a>
+        <button class="nav-refresh" id="refreshBtn" type="button" title="Refresh this page" aria-label="Refresh this page">&#x21bb; Refresh</button>
       </nav>
       <div class="wallet" id="wallet">
         <button class="btn btn-primary" id="connectBtn" type="button">Connect Wallet</button>
@@ -115,6 +118,21 @@
       </div>
     </section>
 
+    <!-- ============ PAGE: MY ASSETS ============ -->
+    <section class="page" id="page-assets" hidden>
+      <div class="hero">
+        <h1>My assets</h1>
+        <p>The logos and files you registered on the blockchain. View or download them; each file is re-checked against its on-chain fingerprint first.</p>
+      </div>
+      <div class="notice" id="assetsNotice">Connect your wallet to see the assets you own, or tick "Show all registered assets" below.</div>
+      <div class="assets-bar">
+        <label class="tiny"><input type="checkbox" id="assetsAll" /> Show all registered assets</label>
+        <span class="muted tiny" id="assetsCount"></span>
+      </div>
+      <div class="asset-grid" id="assetGrid"></div>
+      <p class="muted tiny">The blockchain stores the fingerprint, name and owner, not the file. Your file is kept only in this browser; on another device use "Attach file" to add it back (it must match the fingerprint).</p>
+    </section>
+
     <!-- ============ PAGE: DASHBOARD ============ -->
     <section class="page" id="page-dashboard" hidden>
       <div class="hero">
@@ -158,6 +176,37 @@
         </div>
       </div>
     </section>
+
+    <!-- ============ PAGE: LEDGER ============ -->
+    <section class="page" id="page-ledger" hidden>
+      <div class="hero">
+        <h1>Transaction ledger</h1>
+        <p>Every registration and every ALUT transfer, read directly from the blockchain, plus a tamper-evident log of each step taken in this browser.</p>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="label">Latest block</span><strong id="lgHead">-</strong><span class="muted">chain head</span></div>
+        <div class="stat"><span class="label">Transactions</span><strong id="lgTx">-</strong><span class="muted">involving these contracts</span></div>
+        <div class="stat"><span class="label">Ledger events</span><strong id="lgEvents">-</strong><span class="muted">registrations, mints, transfers</span></div>
+      </div>
+      <div class="card">
+        <h2>On-chain ledger</h2>
+        <p class="muted tiny" id="chainStatus">Loading...</p>
+        <div class="table-wrap"><table class="holders ledger">
+          <thead><tr><th class="num">Block</th><th>Time</th><th>Type</th><th>Details</th><th>Transaction</th><th>Block hash / parent</th></tr></thead>
+          <tbody id="chainBody"><tr><td colspan="6" class="muted">Loading...</td></tr></tbody>
+        </table></div>
+        <p class="muted tiny">Each block stores its parent's hash, so the rows link back to the genesis block. Click a block or transaction to open it on Etherscan.</p>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <h2>Activity log <span class="pill" id="logIntegrity"></span></h2>
+        <p class="muted tiny">Every step in this browser (wallet, hashing, verification, signing, confirmation) is appended in order. Each entry stores the hash of the one before it, so changing or deleting an old entry breaks the chain and is flagged.</p>
+        <div class="table-wrap"><table class="holders ledger">
+          <thead><tr><th class="num">#</th><th>Time</th><th>Step</th><th>Description</th><th>Transaction</th><th>Entry hash</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table></div>
+        <p><button class="btn btn-dark" type="button" id="exportLog">Export log (JSON)</button></p>
+      </div>
+    </section>
   </main>
 
   <footer class="wrap footer">
@@ -165,9 +214,19 @@
     <span class="mono" id="footNet"></span>
   </footer>
 
+
+  <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Asset viewer">
+    <div class="viewer-box">
+      <div class="viewer-head"><strong id="viewerTitle"></strong><button class="link-btn" id="viewerClose" type="button">Close</button></div>
+      <img id="viewerImg" alt="" />
+    </div>
+  </div>
+
   <script src="vendor/ethers.umd.min.js"></script>
   <script src="js/deployment.js"></script>
   <script src="js/alu.js"></script>
+  <script src="js/ledger.js"></script>
+  <script src="js/assets.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

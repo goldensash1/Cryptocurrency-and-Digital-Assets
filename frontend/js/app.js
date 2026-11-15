@@ -64,7 +64,7 @@
   const fmtDate = (d) => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // -------------------------------------------------------------- routing
-  const routes = ["verify", "register", "dashboard"];
+  const routes = ["verify", "register", "assets", "dashboard", "ledger"];
   function currentRoute() {
     const r = location.hash.replace("#/", "");
     return routes.includes(r) ? r : "verify";
@@ -77,8 +77,11 @@
     });
     if (route === "dashboard") refreshDashboard();
     if (route === "register") refreshRegisterState();
+    if (route === "assets") Assets.refresh(registryRead, wallet.account);
+    if (route === "ledger") { Ledger.renderLog(); Ledger.refreshChain(readProvider, registryRead, tokenRead); }
   }
   window.addEventListener("hashchange", renderRoute);
+  $("refreshBtn").addEventListener("click", () => location.reload());
 
   // --------------------------------------------------------------- wallet
   async function connectWallet() {
@@ -110,6 +113,7 @@
     // Same ABIs and addresses, but connected to the signer so the wallet signs.
     wallet.registry = new ethers.Contract(D.registryAddress, D.registryAbi, wallet.signer);
     wallet.token = new ethers.Contract(D.tokenAddress, D.tokenAbi, wallet.signer);
+    Ledger.log("wallet", "Wallet connected: " + wallet.account + " on chain " + network.chainId + (wallet.onRightNetwork ? " (" + D.network.name + ")" : " (wrong network)"));
     updateNetworkBanner();
     await refreshWalletUI();
     renderRoute();
@@ -118,6 +122,7 @@
   function disconnectWallet(remember = true) {
     // A website cannot force MetaMask to disconnect; we simply forget the account.
     if (remember) localStorage.setItem("aluDisconnected", "1");
+    if (wallet.account) Ledger.log("wallet", "Wallet disconnected: " + wallet.account);
     Object.assign(wallet, { account: null, signer: null, registry: null, token: null, onRightNetwork: false });
     setBanner(null);
     refreshWalletUI();
@@ -134,6 +139,7 @@
 
   async function switchNetwork() {
     const chainIdHex = "0x" + D.network.chainId.toString(16);
+    Ledger.log("wallet", "Asked wallet to switch to " + D.network.name);
     try {
       await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chainIdHex }] });
     } catch (err) {
@@ -228,8 +234,10 @@
     out.className = "result pending";
     out.hidden = false;
     out.replaceChildren(el("p", { text: "Checking the blockchain..." }));
+    Ledger.log("verify", "Verification requested for hash " + hash);
     try {
       const r = await ALU.verifyHash(registryRead, D.logoTokenId, hash);
+      Ledger.log("verify", r.authentic ? "Result: authentic ALU logo (matches token #" + D.logoTokenId + ")" : "Result: NOT the official logo (modified or unknown)");
       if (r.authentic) {
         showResult(out, "ok", "✓", r.title, r.message, [
           ["Registered as", r.asset.name],
@@ -240,13 +248,14 @@
         showResult(out, "bad", "!", r.title, r.message);
       }
     } catch (err) {
+      Ledger.log("error", "Verification failed: " + ALU.friendlyError(err));
       showResult(out, "bad", "!", "We could not check this logo", ALU.friendlyError(err));
     }
   }
 
   wireDropzone({
     zone: $("verifyDrop"), input: $("verifyFile"), preview: $("verifyPreview"), text: $("verifyDropText"),
-    onHash: (hash) => runVerification(hash),
+    onHash: (hash, file) => { Ledger.log("hash", "Hashed file " + file.name + " in the browser (SHA-256): " + hash); runVerification(hash); },
   });
   $("verifyHashForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -269,9 +278,12 @@
     $("registerBtn").disabled = !ready;
   }
 
+  let regFile = null;
   wireDropzone({
     zone: $("regDrop"), input: $("regFile"), preview: $("regPreview"), text: $("regDropText"),
     onHash: (hash, file) => {
+      regFile = file;
+      Ledger.log("hash", "Hashed file " + file.name + " for registration (SHA-256): " + hash);
       $("regHashShown").textContent = hash;   // B1: show the computed bytes32 hash
       $("regHash").value = hash;              // B2: pre-fill the form
       if (!$("regName").value) $("regName").value = file.name.replace(/\.[^.]+$/, "");
@@ -288,15 +300,19 @@
 
     $("registerBtn").disabled = true;
     showResult(out, "pending", "…", "Waiting for your approval", "Confirm the transaction in your wallet.");
+    Ledger.log("register", "Requested approval to register \"" + $("regName").value + "\" with hash " + $("regHash").value);
     try {
       const { tokenId, txHash } = await ALU.registerAsset(
         wallet.registry,
         { name: $("regName").value, fileType: $("regType").value, hash: $("regHash").value },
-        { onSubmitted: () => showResult(out, "pending", "…", "Registering...", "Transaction sent. Waiting for the blockchain to confirm it.") }
+        { onSubmitted: (h) => { Ledger.log("register", "Transaction signed and broadcast, waiting for confirmation", h); showResult(out, "pending", "…", "Registering...", "Transaction sent. Waiting for the blockchain to confirm it."); } }
       );
+      Ledger.log("register", "Confirmed in a block: asset registered as NFT #" + tokenId.toString(), txHash);
+      if (regFile) await Assets.saveFile($("regHash").value, regFile);
       showResult(out, "ok", "✓", "Asset registered! Token ID: " + tokenId.toString(),
         "Your asset is now permanently recorded and the NFT is in your wallet.", [["Transaction", ALU.shortAddress(txHash)]]);
     } catch (err) {
+      Ledger.log("error", "Registration failed: " + ALU.friendlyError(err));
       showResult(out, "bad", "!", "Registration failed", ALU.friendlyError(err));
     } finally {
       refreshRegisterState();
@@ -331,14 +347,32 @@
       }
       const rows = await ALU.getHolders(tokenRead, people.map((p) => p.address));
       if (run !== dashboardRun) return;
-      $("holdersBody").replaceChildren(...rows.map((r, i) => {
+      $("holdersBody").replaceChildren(...rows.flatMap((r, i) => {
         const isYou = wallet.account && r.address.toLowerCase() === wallet.account.toLowerCase();
         const who = el("td", {}, el("div", { class: "who" }, people[i].label, isYou ? el("span", { class: "you", text: "You" }) : ""),
           el("div", { class: "addr mono", text: ALU.shortAddress(r.address), title: r.address }));
         const bar = el("div", { class: "bar" }, el("i", { style: `width:${Math.min(100, r.exactPercentage)}%` }));
-        return el("tr", {}, who,
+        const row = el("tr", { class: "holder-row", tabindex: "0", title: "Click to show wallet address" }, who,
           el("td", { class: "num", text: ALU.formatNumber(r.balance) }),
           el("td", { class: "num" }, el("div", { text: r.percentage + "%" }), el("div", { class: "tiny muted", text: r.exactPercentage.toFixed(2) + "%" }), bar));
+        const copyBtn = el("button", { class: "link-btn", type: "button", text: "Copy" });
+        copyBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try { await navigator.clipboard.writeText(r.address); copyBtn.textContent = "Copied"; }
+          catch { copyBtn.textContent = "Select and copy"; }
+          setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
+        });
+        const detail = el("td", { colspan: "3" },
+          el("span", { class: "tiny muted", text: "Wallet address: " }),
+          el("span", { class: "mono addr-full", text: r.address }), copyBtn);
+        if (D.network.name === "sepolia") {
+          detail.append(el("a", { class: "tiny", href: "https://sepolia.etherscan.io/address/" + r.address, target: "_blank", rel: "noopener", text: "View on Etherscan" }));
+        }
+        const detailRow = el("tr", { class: "holder-detail", hidden: "" }, detail);
+        const toggle = () => { detailRow.hidden = !detailRow.hidden; row.classList.toggle("open", !detailRow.hidden); };
+        row.addEventListener("click", toggle);
+        row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+        return [row, detailRow];
       }));
 
       // Owner-only form.
@@ -363,20 +397,24 @@
     const amount = $("distAmount").value.trim();
     $("distBtn").disabled = true;
     showResult(out, "pending", "…", "Waiting for your approval", "Confirm the transaction in your wallet.");
+    Ledger.log("distribute", "Requested approval to send " + amount + " ALUT to " + $("distTo").value.trim());
     try {
-      await ALU.distributeShares(wallet.token, wallet.account, $("distTo").value.trim(), amount, ethers.isAddress, {
-        onSubmitted: () => showResult(out, "pending", "…", "Sending...", "Transaction sent. Waiting for confirmation."),
+      const sent = await ALU.distributeShares(wallet.token, wallet.account, $("distTo").value.trim(), amount, ethers.isAddress, {
+        onSubmitted: (h) => { Ledger.log("distribute", "Transaction signed and broadcast, waiting for confirmation", h); showResult(out, "pending", "…", "Sending...", "Transaction sent. Waiting for confirmation."); },
       });
+      Ledger.log("distribute", "Confirmed in a block: " + amount + " ALUT sent to " + $("distTo").value.trim(), sent.txHash);
       showResult(out, "ok", "✓", "Shares sent", `${ALU.formatNumber(amount)} ALUT was sent to ${ALU.shortAddress($("distTo").value.trim())}.`);
       $("distAmount").value = "";
       await Promise.all([refreshDashboard(), refreshWalletUI()]);
     } catch (err) {
+      Ledger.log("error", "Distribution failed: " + ALU.friendlyError(err));
       showResult(out, "bad", "!", "Could not send shares", ALU.friendlyError(err));
       $("distBtn").disabled = false;
     }
   });
 
   // ----------------------------------------------------------------- boot
+  $("assetsAll").addEventListener("change", () => Assets.refresh(registryRead, wallet.account));
   $("connectBtn").addEventListener("click", connectWallet);
   $("disconnectBtn").addEventListener("click", () => disconnectWallet(true));
   $("footNet").textContent = D.network.name + " · registry " + ALU.shortAddress(D.registryAddress);

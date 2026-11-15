@@ -71,6 +71,7 @@ async function main() {
     network: { name: isLocal ? "Hardhat Local" : hre.network.name, chainId: Number(chainId), rpcUrl },
     registryAddress: await registry.getAddress(),
     tokenAddress: await token.getAddress(),
+    deployBlock: (await registry.deploymentTransaction().wait()).blockNumber,
     logoTokenId: 1,
     logoHash: hash,
     holders: holders.map(({ label, address }) => ({ label, address })),

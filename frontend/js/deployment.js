@@ -7,6 +7,7 @@ window.ALU_DEPLOYMENT = {
   },
   "registryAddress": "0xE0997C144615A152610aBA6F0FA13506F1c48145",
   "tokenAddress": "0x10755cC9D4731FEcADc8Af023176a50c0b8266F5",
+  "deployBlock": 12142490,
   "logoTokenId": 1,
   "logoHash": "0x727b0a610a5e22c083efc8b467c1580cad4b2626d8a6171d686a99d6a220a560",
   "holders": [
