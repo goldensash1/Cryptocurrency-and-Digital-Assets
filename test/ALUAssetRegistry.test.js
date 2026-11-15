@@ -3,6 +3,9 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+// The real frontend logic (frontend/js/alu.js) is imported so these tests exercise
+// exactly the code the browser runs.
+const ALU = require("../frontend/js/alu.js");
 
 const LOGO_HASH =
   "0x" + crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, "..", "alu-logo.png"))).digest("hex");
@@ -82,6 +85,58 @@ describe("ALU Logo system", function () {
       await token.distributeShares(alice.address, 500_000n);
       expect(await token.ownershipPercentage(alice.address)).to.equal(50n);
       expect(await token.ownershipPercentage(owner.address)).to.equal(50n);
+    });
+  });
+  // ---------------------------------------------------------------------
+  // Frontend integration tests: they call the same functions that the dApp
+  // screens call (frontend/js/alu.js) against freshly deployed contracts.
+  // ---------------------------------------------------------------------
+  describe("Frontend integration (frontend/js/alu.js)", function () {
+    it("reads the total ALUT supply from the contract and displays 1,000,000", async function () {
+      const summary = await ALU.getTokenSummary(token, owner.address);
+      expect(summary.totalSupplyDisplay).to.equal("1,000,000");
+      expect(summary.balance).to.equal("1000000");
+      expect(summary.percentage).to.equal("100");
+    });
+
+    it("hashing a file returns the correct SHA-256 in bytes32 format", async function () {
+      const bytes = fs.readFileSync(path.join(__dirname, "..", "alu-logo.png"));
+      const file = new File([bytes], "alu-logo.png", { type: "image/png" });
+      const hash = await ALU.hashFile(file);
+      expect(hash).to.match(ALU.BYTES32_RE);       // 0x + 64 lowercase hex chars
+      expect(hash).to.equal(LOGO_HASH);            // matches Node's independent SHA-256
+      expect(ethers.dataLength(hash)).to.equal(32); // really a bytes32
+    });
+
+    it("shows a verification success result for the correct ALU logo hash", async function () {
+      await registry.registerAsset("ALU Official Logo", "image/png", LOGO_HASH);
+      const result = await ALU.verifyHash(registry, 1, LOGO_HASH);
+      expect(result.authentic).to.equal(true);
+      expect(result.title).to.equal("Logo Verified: This is the authentic ALU logo");
+      expect(result.asset.name).to.equal("ALU Official Logo");
+      expect(result.asset.registeredBy).to.equal(owner.address);
+    });
+
+    it("shows a verification failure result for an incorrect hash", async function () {
+      await registry.registerAsset("ALU Official Logo", "image/png", LOGO_HASH);
+      const result = await ALU.verifyHash(registry, 1, FAKE_HASH);
+      expect(result.authentic).to.equal(false);
+      expect(result.title).to.equal("Warning: This logo has been modified");
+      expect(result.asset).to.equal(null);
+    });
+
+    it("distributeShares updates the recipient's balance after a successful transfer", async function () {
+      expect(await token.balanceOf(alice.address)).to.equal(0n);
+      await ALU.distributeShares(token, owner.address, alice.address, "25000", ethers.isAddress);
+      expect(await token.balanceOf(alice.address)).to.equal(25000n);
+      expect(await token.balanceOf(owner.address)).to.equal(975000n);
+      // the dashboard summary for the recipient reflects the new balance
+      const summary = await ALU.getTokenSummary(token, alice.address);
+      expect(summary.balance).to.equal("25000");
+      // a non-owner is stopped with a readable message before anything is sent
+      await expect(
+        ALU.distributeShares(token.connect(alice), alice.address, alice.address, "1", ethers.isAddress)
+      ).to.be.rejectedWith("Only the contract owner can distribute ALUT tokens.");
     });
   });
 });

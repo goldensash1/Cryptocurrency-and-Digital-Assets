@@ -1,10 +1,13 @@
 {
-  "name": "assignment-1--cryptocurrency-and-digital-assets",
+  "name": "alu-logo-registry-dapp",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "hardhat test",
+    "frontend": "node frontend/server.js",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost"
   },
   "keywords": [],
   "author": "",
